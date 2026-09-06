@@ -1,0 +1,123 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_IN_AUTOMATION: "true"
+
+jobs:
+  # ─── CI: validação do Terraform e das migrations ───────────────────────────
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.3"
+
+      - name: Terraform format check
+        run: terraform -chdir=terraform fmt -check -recursive
+
+      - name: Terraform init (sem backend)
+        run: terraform -chdir=terraform init -backend=false
+
+      - name: Terraform validate
+        run: terraform -chdir=terraform validate
+
+      # Sobe um PostgreSQL descartável e aplica as migrations nele. Garante que
+      # o SQL é válido e idempotente antes de tocar no banco real.
+      - name: Testar migrations em PostgreSQL efêmero
+        run: |
+          docker run -d --name pg-test \
+            -e POSTGRES_PASSWORD=test \
+            -e POSTGRES_DB=autogiro \
+            -p 5432:5432 postgres:17-alpine
+
+          for i in $(seq 1 30); do
+            docker exec pg-test pg_isready -U postgres && break
+            sleep 1
+          done
+
+          for file in migrations/*.sql; do
+            echo "Aplicando $file"
+            docker exec -i pg-test psql -U postgres -d autogiro -v ON_ERROR_STOP=1 < "$file"
+          done
+
+          # Reaplica tudo: as migrations precisam ser idempotentes.
+          echo "Reaplicando para verificar idempotência"
+          for file in migrations/*.sql; do
+            docker exec -i pg-test psql -U postgres -d autogiro -v ON_ERROR_STOP=1 < "$file"
+          done
+
+          echo "Tabelas criadas:"
+          docker exec pg-test psql -U postgres -d autogiro -c "\dt"
+
+      - name: Remover container de teste
+        if: always()
+        run: docker rm -f pg-test || true
+
+  # ─── CD: provisiona o Neon e aplica as migrations ──────────────────────────
+  # develop -> branch homolog | main -> branch prod
+  deploy:
+    name: Deploy
+    needs: validate
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'prod' || 'homolog' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.3"
+
+      - name: Terraform Init
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: terraform -chdir=terraform init
+
+      - name: Terraform Apply
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: terraform -chdir=terraform apply -auto-approve
+
+      - name: Aplicar migrations
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            DB_URL=$(terraform -chdir=terraform output -raw prod_database_url)
+          else
+            DB_URL=$(terraform -chdir=terraform output -raw homolog_database_url)
+          fi
+
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+          for file in migrations/*.sql; do
+            echo "Aplicando $file"
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$file"
+          done
+
+      - name: Resumo
+        env:
+          NEON_BRANCH: ${{ github.ref_name == 'main' && 'prod' || 'homolog' }}
+        run: |
+          {
+            echo "### Banco provisionado"
+            echo "Branch do Neon: ${NEON_BRANCH}"
+            echo "Migrations aplicadas com sucesso."
+          } >> "$GITHUB_STEP_SUMMARY"

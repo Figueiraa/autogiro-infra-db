@@ -1,0 +1,12 @@
+# Copie para terraform.tfvars e ajuste se necessário.
+# A API key NÃO vai aqui: exporte como variável de ambiente.
+#
+#   PowerShell:  $env:NEON_API_KEY = "sua-api-key"
+#   Bash:        export NEON_API_KEY="sua-api-key"
+
+project_name = "autogiro"
+region       = "aws-us-east-2"
+pg_version   = 17
+
+database_name = "autogiro"
+role_name     = "autogiro_app"
