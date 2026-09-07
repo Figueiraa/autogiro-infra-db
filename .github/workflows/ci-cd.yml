@@ -104,6 +104,7 @@ jobs:
       - name: Terraform Init
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          TF_VAR_org_id: ${{ secrets.NEON_ORG_ID }}
           TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
           TF_WORKSPACE: autogiro-infra-db-${{ github.ref_name == 'main' && 'prod' || 'homolog' }}
         run: terraform -chdir=terraform init
@@ -111,6 +112,7 @@ jobs:
       - name: Terraform Apply
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          TF_VAR_org_id: ${{ secrets.NEON_ORG_ID }}
           TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
           TF_WORKSPACE: autogiro-infra-db-${{ github.ref_name == 'main' && 'prod' || 'homolog' }}
         run: terraform -chdir=terraform apply -auto-approve
@@ -118,6 +120,7 @@ jobs:
       - name: Aplicar migrations
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          TF_VAR_org_id: ${{ secrets.NEON_ORG_ID }}
           TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
           TF_WORKSPACE: autogiro-infra-db-${{ github.ref_name == 'main' && 'prod' || 'homolog' }}
         run: |
