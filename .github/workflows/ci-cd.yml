@@ -16,6 +16,9 @@ concurrency:
 
 env:
   TF_IN_AUTOMATION: "true"
+  # Nunca perguntar nada no terminal: com o backend `cloud` declarado, um prompt
+  # de credencial travaria o job em vez de falhar.
+  TF_INPUT: "0"
 
 jobs:
   # ─── CI: validação do Terraform e das migrations ───────────────────────────
@@ -95,19 +98,28 @@ jobs:
         with:
           terraform_version: "1.10.3"
 
+      # O state vive no HCP Terraform. Sem isso, cada execução criaria um NOVO
+      # projeto no Neon: `neon_project` não é idempotente por nome e o free tier
+      # permite apenas um projeto.
       - name: Terraform Init
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+          TF_WORKSPACE: autogiro-infra-db-${{ github.ref_name == 'main' && 'prod' || 'homolog' }}
         run: terraform -chdir=terraform init
 
       - name: Terraform Apply
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+          TF_WORKSPACE: autogiro-infra-db-${{ github.ref_name == 'main' && 'prod' || 'homolog' }}
         run: terraform -chdir=terraform apply -auto-approve
 
       - name: Aplicar migrations
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+          TF_WORKSPACE: autogiro-infra-db-${{ github.ref_name == 'main' && 'prod' || 'homolog' }}
         run: |
           if [ "${GITHUB_REF_NAME}" = "main" ]; then
             DB_URL=$(terraform -chdir=terraform output -raw prod_database_url)
