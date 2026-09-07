@@ -2,6 +2,7 @@
 # O projeto do Neon já nasce com uma branch `main`, que usamos como produção.
 resource "neon_project" "autogiro" {
   name       = var.project_name
+  org_id     = var.org_id
   region_id  = var.region
   pg_version = var.pg_version
 
