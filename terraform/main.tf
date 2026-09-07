@@ -28,21 +28,26 @@ resource "neon_branch" "homolog" {
 }
 
 resource "neon_endpoint" "homolog" {
-  project_id              = neon_project.autogiro.id
-  branch_id               = neon_branch.homolog.id
-  type                    = "read_write"
-  suspend_timeout_seconds = var.autosuspend_seconds
-}
-
-resource "neon_role" "homolog" {
   project_id = neon_project.autogiro.id
   branch_id  = neon_branch.homolog.id
-  name       = var.role_name
+  type       = "read_write"
+
+  # `suspend_timeout_seconds` não é declarado de propósito: o free tier do Neon
+  # responde 412 "modifying the suspend interval is not permitted on this
+  # account". O autosuspend continua ativo, com o intervalo padrão da conta.
 }
 
-resource "neon_database" "homolog" {
+# A role e o database NÃO são recriados aqui: ao nascer de `prod`, a branch
+# `homolog` já herda ambos — `autogiro_app` e `autogiro`. Declará-los faria a API
+# responder 409 ROLE_ALREADY_EXISTS.
+#
+# O data source abaixo apenas lê a senha da role herdada, para montar a connection
+# string de homologação nos outputs.
+data "neon_branch_role_password" "homolog" {
   project_id = neon_project.autogiro.id
   branch_id  = neon_branch.homolog.id
-  owner_name = neon_role.homolog.name
-  name       = var.database_name
+  role_name  = var.role_name
+
+  depends_on = [neon_endpoint.homolog]
 }
+
