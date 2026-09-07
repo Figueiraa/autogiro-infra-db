@@ -18,10 +18,10 @@ output "homolog_database_url" {
   description = "Connection string da branch de homologação (driver psycopg)."
   value = format(
     "postgresql://%s:%s@%s/%s?sslmode=require",
-    neon_role.homolog.name,
-    neon_role.homolog.password,
+    var.role_name,
+    data.neon_branch_role_password.homolog.password,
     neon_endpoint.homolog.host,
-    neon_database.homolog.name,
+    var.database_name,
   )
   sensitive = true
 }
@@ -32,10 +32,10 @@ output "homolog_database_url_asyncpg" {
   description = "Connection string de homologação para o SQLAlchemy (asyncpg)."
   value = format(
     "postgresql+asyncpg://%s:%s@%s/%s?ssl=require",
-    neon_role.homolog.name,
-    neon_role.homolog.password,
+    var.role_name,
+    data.neon_branch_role_password.homolog.password,
     neon_endpoint.homolog.host,
-    neon_database.homolog.name,
+    var.database_name,
   )
   sensitive = true
 }
