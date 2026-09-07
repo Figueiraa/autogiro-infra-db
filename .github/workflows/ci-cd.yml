@@ -47,8 +47,18 @@ jobs:
             -e POSTGRES_DB=autogiro \
             -p 5432:5432 postgres:17-alpine
 
-          for i in $(seq 1 30); do
-            docker exec pg-test pg_isready -U postgres && break
+          # pg_isready responde OK durante o bootstrap, antes de o POSTGRES_DB
+          # existir. Esperamos o banco autogiro aceitar query de verdade.
+          for i in $(seq 1 60); do
+            if docker exec pg-test psql -U postgres -d autogiro -c 'SELECT 1' >/dev/null 2>&1; then
+              echo "Banco autogiro pronto apos ${i}s"
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "Timeout: banco autogiro nao ficou pronto"
+              docker logs pg-test
+              exit 1
+            fi
             sleep 1
           done
 
