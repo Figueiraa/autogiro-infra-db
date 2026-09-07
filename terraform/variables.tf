@@ -1,3 +1,17 @@
+variable "history_retention_seconds" {
+  description = <<-EOT
+    Janela de point-in-time recovery, em segundos. O free tier do Neon aceita no
+    máximo 21600 (6 horas) — valores maiores fazem a API rejeitar a criação.
+  EOT
+  type        = number
+  default     = 21600
+
+  validation {
+    condition     = var.history_retention_seconds <= 21600
+    error_message = "O free tier do Neon limita a retenção a 21600 segundos (6 horas)."
+  }
+}
+
 variable "org_id" {
   description = <<-EOT
     Identificador da organização no Neon (formato `org-xxxx-xxxx-00000000`).

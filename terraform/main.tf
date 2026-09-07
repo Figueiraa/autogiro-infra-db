@@ -6,8 +6,9 @@ resource "neon_project" "autogiro" {
   region_id  = var.region
   pg_version = var.pg_version
 
-  # Suspende o compute após inatividade, preservando a cota de CU-horas.
-  history_retention_seconds = 86400 # 1 dia (suficiente no free tier)
+  # Janela de point-in-time recovery. O free tier do Neon limita a 6 horas
+  # (21600s); pedir mais faz a API rejeitar a criação do projeto.
+  history_retention_seconds = var.history_retention_seconds
 
   branch {
     name          = "prod"
