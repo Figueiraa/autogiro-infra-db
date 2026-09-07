@@ -1,3 +1,12 @@
+variable "org_id" {
+  description = <<-EOT
+    Identificador da organização no Neon (formato `org-xxxx-xxxx-00000000`).
+    A API do Neon passou a exigi-lo na criação de projetos. Encontre em
+    Organization settings, ou na URL do console.
+  EOT
+  type        = string
+}
+
 variable "project_name" {
   description = "Nome do projeto no Neon."
   type        = string
