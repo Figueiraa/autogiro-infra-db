@@ -43,6 +43,14 @@ resource "neon_endpoint" "homolog" {
 #
 # O data source abaixo apenas lê a senha da role herdada, para montar a connection
 # string de homologação nos outputs.
+# Senha da role na branch de producao, para montar a connection string do
+# driver asyncpg nos outputs.
+data "neon_branch_role_password" "prod" {
+  project_id = neon_project.autogiro.id
+  branch_id  = neon_project.autogiro.branch[0].id
+  role_name  = var.role_name
+}
+
 data "neon_branch_role_password" "homolog" {
   project_id = neon_project.autogiro.id
   branch_id  = neon_branch.homolog.id
