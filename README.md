@@ -191,7 +191,7 @@ seus próprios repositórios:
 
 | Consumidor | Documentação | O que acessa |
 |---|---|---|
-| [autogiro-app](https://github.com/Figueiraa/autogiro-app#documentação-da-api) | Swagger em `/docs`, OpenAPI em `/openapi.json`, [coleção Postman](https://github.com/Figueiraa/autogiro-app/blob/main/docs/autogiro.postman_collection.json) com 21 requisições | Todas as 9 tabelas, via SQLAlchemy assíncrono |
+| [autogiro-app](https://github.com/Figueiraa/autogiro-app#documentação-da-api) | Swagger em `/docs`, OpenAPI em `/openapi.json`, [coleção Postman](https://github.com/Figueiraa/autogiro-app/blob/main/docs/autogiro.postman_collection.json) com 21 requisições | Todas as 8 tabelas, via SQLAlchemy assíncrono |
 | [autogiro-auth](https://github.com/Figueiraa/autogiro-auth) | Endpoint único, contrato no README | Somente leitura de `clients`: `SELECT id, name, cpf_cnpj, is_active WHERE cpf_cnpj = %s` |
 
 O acesso da Lambda é deliberadamente mínimo — uma consulta, quatro colunas. Ela precisa saber
