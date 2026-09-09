@@ -54,6 +54,7 @@ requisito R5.
 │ phone           │  1    N │ brand           │
 │ email           │         │ model           │
 │ address         │         │ year            │
+│ is_active       │         │                 │
 └─────────────────┘         └────────┬────────┘
         │                            │
         │ 1                        1 │
@@ -135,9 +136,25 @@ cobrado precisa refletir o momento da venda, não o preço atual do catálogo.
 |---|---|
 | [`001_schema_inicial.sql`](migrations/001_schema_inicial.sql) | Tipos, tabelas e constraints |
 | [`002_indices.sql`](migrations/002_indices.sql) | Índices de performance |
+| [`003_seed_demonstracao.sql`](migrations/003_seed_demonstracao.sql) | Dados de demonstração: 5 clientes, 6 veículos, 6 tipos de serviço, 8 peças |
+| [`004_status_do_cliente.sql`](migrations/004_status_do_cliente.sql) | Coluna `is_active` em `clients` e índice parcial |
 
-Todas são **idempotentes** (`IF NOT EXISTS`) — reaplicar não gera erro. A pipeline valida isso
-aplicando cada migration duas vezes em um PostgreSQL efêmero.
+**A 003 é o que torna a demonstração possível.** Sem cliente cadastrado, toda autenticação
+responde 401 — corretamente, mas o caminho de sucesso nunca aparece. Os CPFs do seed são
+fictícios e válidos pelos dígitos verificadores; `44232322191` (Maria Oliveira) é o usado nos
+exemplos dos outros repositórios.
+
+**A 004 atende um requisito explícito do enunciado**, que pede à function serverless consultar
+"a existência **e o status** do cliente". Antes dela a tabela só modelava existência. O seed
+deixa `Transportes Lima ME` inativo de propósito, para que o caminho de recusa (403) possa ser
+demonstrado.
+
+Todas são **idempotentes** — reaplicar não gera erro. As três primeiras usam `IF NOT EXISTS` ou
+`ON CONFLICT DO NOTHING`; a 004 usa `IF NOT EXISTS` na coluna e no índice. A pipeline valida
+isso aplicando cada migration duas vezes em um PostgreSQL efêmero.
+
+> Aplicar todas as migrations **insere os dados de demonstração**. Para um banco limpo, aplique
+> apenas a 001, a 002 e a 004.
 
 ## Uso
 
@@ -166,6 +183,20 @@ done
 docker exec pg psql -U postgres -d autogiro -c '\dt'
 ```
 
+## As APIs que consomem este banco
+
+Este repositório não expõe API — provisiona o banco e versiona o schema. Quem lê e escreve
+nestas tabelas são os outros dois serviços, e a documentação das interfaces deles fica em
+seus próprios repositórios:
+
+| Consumidor | Documentação | O que acessa |
+|---|---|---|
+| [autogiro-app](https://github.com/Figueiraa/autogiro-app#documentação-da-api) | Swagger em `/docs`, OpenAPI em `/openapi.json`, [coleção Postman](https://github.com/Figueiraa/autogiro-app/blob/main/docs/autogiro.postman_collection.json) com 21 requisições | Todas as 9 tabelas, via SQLAlchemy assíncrono |
+| [autogiro-auth](https://github.com/Figueiraa/autogiro-auth) | Endpoint único, contrato no README | Somente leitura de `clients`: `SELECT id, name, cpf_cnpj, is_active WHERE cpf_cnpj = %s` |
+
+O acesso da Lambda é deliberadamente mínimo — uma consulta, quatro colunas. Ela precisa saber
+se o cliente existe e se está ativo, e nada além disso.
+
 ## Ambientes
 
 O Neon versiona o banco como o Git. Cada branch tem dados isolados, sem custo adicional de storage:
@@ -178,4 +209,11 @@ O Neon versiona o banco como o Git. Cada branch tem dados isolados, sem custo ad
 ## Custo
 
 Free tier permanente do Neon: **0,5 GB de storage** e **100 CU-horas/mês**, sem cartão de crédito.
-O compute suspende após 5 minutos de inatividade (`autosuspend_seconds`), preservando a cota.
+O compute suspende sozinho após um período de inatividade, preservando a cota — mas o
+intervalo **não é configurável** aqui: o free tier responde `412 modifying the suspend interval
+is not permitted on this account`. Por isso `suspend_timeout_seconds` não é declarado no
+Terraform (ver o comentário em `terraform/main.tf`), e vale o padrão da conta.
+
+Consequência prática: depois de um tempo parado, a **primeira** consulta acorda o compute e pode
+demorar alguns segundos — o suficiente para estourar o timeout de 10s da Lambda. A segunda
+tentativa funciona. Vale "aquecer" o banco antes de uma demonstração.
